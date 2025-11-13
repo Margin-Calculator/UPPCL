@@ -2,16 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UPPCL Bill Calculator</title>
-<link rel="stylesheet" href="styles/style.css">
+<style>
+body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+h1 { text-align: center; }
+form { display: grid; gap: 10px; }
+label { display: flex; flex-direction: column; }
+input, select, button { padding: 10px; margin-top: 5px; box-sizing: border-box; width: 100%; font-size: 16px; }
+button { background: #007bff; color: white; border: none; cursor: pointer; }
+button:hover { background: #0056b3; }
+#result { margin-top: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; }
+@media (max-width: 600px) { body { padding: 10px; } form { gap: 8px; } input, select, button { font-size: 14px; } }
+</style>
 </head>
 <body>
-<h1>UPPCL Bill Calculator</h1>
-<div>
-<label>Units Consumed: <input id="units" type="number"></label>
-<button onclick="calculateBill()">Calculate</button>
-</div>
+<h1>UPPCL Bill Calculator (2025 Rates)</h1>
+<form onsubmit="calculateBill(); return false;">
+<label>Consumer Type: 
+<select id="type">
+<option value="urban">Urban</option>
+<option value="rural">Rural</option>
+</select>
+</label>
+<label>BPL Consumer? <input id="bpl" type="checkbox"></label>
+<label>Contracted Load (kW): <input id="load" type="number" min="1" value="1" required></label>
+<label>Units Consumed: <input id="units" type="number" min="0" required></label>
+<button type="submit">Calculate</button>
+</form>
 <div id="result"></div>
-<script src="scripts/calculator.js"></script>
+<script>
+function calculateBill() {
+  const type = document.getElementById('type').value;
+  const bpl = document.getElementById('bpl').checked;
+  const load = parseFloat(document.getElementById('load').value);
+  const units = parseFloat(document.getElementById('units').value);
+  
+  if (isNaN(load) || isNaN(units) || load <= 0 || units < 0) {
+    alert('Please enter valid positive numbers.');
+    return;
+  }
+  
+  let fixedCharge = 0;
+  let energyCharge = 0;
+  
+  if (bpl) {
+    if (units > 100) {
+      alert('BPL applicable only up to 100 units.');
+      return;
+    }
+    fixedCharge = 10;
+    energyCharge = units * 3.00;
+  } else {
+    fixedCharge = (type === 'urban' ? 110 : 90) * load;
+    
+    const slabs = type === 'urban' ? [
+      { max: 100, rate: 5.50 },
+      { max: 150, rate: 6.00 },
+      { max: 300, rate: 6.50 },
+      { max: 500, rate: 7.00 },
+      { max: Infinity, rate: 7.50 }
+    ] : [
+      { max: 100, rate: 3.50 },
+      { max: 150, rate: 5.00 },
+      { max: 300, rate: 5.00 },
+      { max: 500, rate: 6.50 },
+      { max: Infinity, rate: 7.00 }
+    ];
+    
+    let remaining = units;
+    let prevMax = 0;
+    for (const slab of slabs) {
+      const slabUnits = Math.min(remaining, slab.max - prevMax);
+      energyCharge += slabUnits * slab.rate;
+      remaining -= slabUnits;
+      prevMax = slab.max;
+      if (remaining <= 0) break;
+    }
+  }
+  
+  const subtotal = fixedCharge + energyCharge;
+  const duty = subtotal * 0.05;
+  const surcharge = subtotal * 0.0124;
+  const total = subtotal + duty + surcharge;
+  
+  document.getElementById('result').innerHTML = `
+    <p>Fixed Charge: ₹${fixedCharge.toFixed(2)}</p>
+    <p>Energy Charge: ₹${energyCharge.toFixed(2)}</p>
+    <p>Electricity Duty (5%): ₹${duty.toFixed(2)}</p>
+    <p>Fuel Surcharge (1.24%): ₹${surcharge.toFixed(2)}</p>
+    <p><strong>Total Bill: ₹${total.toFixed(2)}</strong></p>
+  `;
+}
+</script>
 </body>
 </html>
